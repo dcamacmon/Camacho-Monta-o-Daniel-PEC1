@@ -12,12 +12,13 @@ El dataset consta de las siguientes columnas:
 | Columna                   | Descripción                                               |
 |---------------------------|-----------------------------------------------------------|
 | `SequenceModifications`   | Tipo de modificaciones en la secuencia y ubicación.       |
-| `Accession`               | Identificador de la secuencia.                            |
+| `Accession`               | Identificador.                                            |
 | `Description`             | Descripción de la secuencia analizada.                    |
 | `Score`                   | Score que evalúa la confiabilidad de la identificación.   |
 | `CLASS`                   | Clase de la muestra (H o C).                              |
 | `PHOSPHO`                 | Aminoácido donde ocurre la fosforilación (Y, S/T).        |
 | `Group`                   | Grupo tumoral (MSS o PD).                                 |
+| `Peptide_id`              | Identificador de la secuencia                             |
 
 
 ## Información sobre los Grupos
