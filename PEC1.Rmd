@@ -200,7 +200,7 @@ El mensaje de retorno `[1] 0` indica que los comandos se ejecutaron correctament
 
 # 3. Análisis de los datos
 
-## 3.1 Estudio de la distribución
+## 3.1 Estudio de la varianza entre réplicas
 
 Con el SE, podremos visualizar los datos para entender su distribución y variabilidad. Tenemos dos grupos principales (las clases tumorales), pero dentro de cada grupo podemos clasificar 3 muestras en cada uno. 
 
@@ -235,56 +235,59 @@ Para obtener el resultado de test de Levene para todas las réplicas, primero cr
 
 ```{r}
 abundance_data<-assay(se, "counts")
-muestras <- c("M1", "M5", "T49", "M42", "M43", "M64") # Obtener los nombres de las columnas para las réplicas
+
+# Obtenemos los nombres de las columnas para las réplicas
+muestras <- c("M1", "M5", "T49", "M42", "M43", "M64") 
 
 resultados_levene <- data.frame(Muestra = character(),
                                 p_valor = numeric(),
                                 stringsAsFactors = FALSE)
 ```
 
-Seguidamente, iteraremos las muestras en que el sufijo "_MSS" o "_PD" indicará el grupo, y el sufijo "_1" o "_2" indicará la réplica. Entonces, ejecutaremos un bucle `if else`, en que se verifica si existe una columna MSS (if, col1 y col2) o PD (else, col3 o col4) y evaluará los datos de la varianza de la réplica 1 (_1) respecto a la réplica 2 (_2) con el test de Levene. Finalmente, guardará los datos en el dataframe que hemos creado anteriormente (vacío hasta el momento).
+Seguidamente, iteraremos las muestras en que el sufijo "_MSS" o "_PD" indicará el grupo, y el sufijo "_1" o "_2" indicará la réplica. Entonces, ejecutaremos un bucle `if else`, en que se verifica si existe una columna MSS (if, col1 y col2) o PD (else, col3 o col4) y almacenará las abundancias. Seguidamente, se evaluarán los datos de la varianza de la réplica 1 (_1) respecto a la réplica 2 (_2) con el test de Levene. Finalmente, guardará los datos en el dataframe que hemos creado anteriormente (vacío hasta el momento).
 
 ```{r}
-# Empezamos por iterar sobre las muestras
+resultados_levene <- data.frame(Muestra = character(),
+                                 p_valor = numeric(),
+                                 stringsAsFactors = FALSE) # Inicializamos el dataframe para almacenar resultados
+
+# Iteramos sobre las muestras
 for (muestra in muestras) {
-  # Definimos los nombres de las columnas de las réplicas de MSS
+  # Definimos los nombres de las columnas de las réplicas de MSS y PD
   col1 <- paste0(muestra, "_1_MSS")
   col2 <- paste0(muestra, "_2_MSS")
-  
-  # Definimos los nombres de las columnas de las réplicas  dePD
   col3 <- paste0(muestra, "_1_PD")
   col4 <- paste0(muestra, "_2_PD")
   
-  # Verificamos si ambas columnas MSS existen
+  # Inicializamos la variable abundancias
+  abundancias <- NULL
+  
+  # Verificamos si ambas columnas MSS existen, guardamos los datos
   if (col1 %in% colnames(abundance_data) & col2 %in% colnames(abundance_data)) {
-    
-    abundancias <- abundance_data[, c(col1, col2)]# Extraemos las abundancias de las dos réplicas MSS
-    # Crear un dataframe para el test de Levene
-    datos <- data.frame(
-      Abundancia = c(abundancias[, 1], abundancias[, 2]),
-      Replica = factor(rep(c("Replica 1", "Replica 2"), each = nrow(abundancias)))
-    )
-    # Realizar el test de Levene
-    resultado_levene <- leveneTest(Abundancia ~ Replica, data = datos)
-    # Guardar el p-valor en la tabla de resultados
-    resultados_levene <- rbind(resultados_levene, 
-                                data.frame(Muestra = muestra, 
-                                           p_valor = resultado_levene$`Pr(>F)`[1]))
-    #En caso de no ser MSS, será PD, y repetiremos el proceso para el resto de muestras PD
-  } else if (col3 %in% colnames(abundance_data) & col4 %in% colnames(abundance_data)) 
-    {
+    abundancias <- abundance_data[, c(col1, col2)]
+  } 
+  # Verificamos si ambas columnas PD existen, guardamos los datos
+  else if (col3 %in% colnames(abundance_data) & col4 %in% colnames(abundance_data)) {
     abundancias <- abundance_data[, c(col3, col4)]
+  }
+  
+  # Si se encontraron abundancias, se realiza el test de Levene
+  if (!is.null(abundancias)) {
     datos <- data.frame(
       Abundancia = c(abundancias[, 1], abundancias[, 2]),
       Replica = factor(rep(c("Replica 1", "Replica 2"), each = nrow(abundancias)))
     )
     resultado_levene <- leveneTest(Abundancia ~ Replica, data = datos)
+    
+    # Guardar el p-valor en la tabla de resultados
     resultados_levene <- rbind(resultados_levene, 
                                 data.frame(Muestra = muestra, 
                                            p_valor = resultado_levene$`Pr(>F)`[1]))
   }
 }
+
 ```
+
 
 Finalmente, mostramos el resultado de los test de Levene.
 
@@ -293,6 +296,8 @@ print(resultados_levene)
 ```
 
 Vemos entonces, que no hay diferencias significativas en la variablidad entre las réplicas de las muestras de los dos grupos. Esto implica, que podemos promediar las réplicas, o mantenerlas independientes para los futuros análisis. En este caso, debido a que en los estudios de LC-MS la variabilidad puede mostrar diferencias biológicas subyacentes en las muestras, mantendremos cada réplica como una muestra independiente.
+
+## 3.2 Visualización de la distribución
 
 A continuación, mostraremos la distribución de las muestras de la matriz de abundancia. 
 
@@ -310,7 +315,7 @@ abundance_long <- melt(abundance_data)
 colnames(abundance_long) <- c("Fosfopéptido", "Muestra", "Abundancia")
 ```
 
-Después, dividiremos los dos grupos tumorales (MSS y PD).
+Después, dividiremos los dos grupos tumorales (MSS y PD) y se especificarán correspondientemente.
 
 ```{r}
 grupos <- as.data.frame(colData(se)$Group)
@@ -318,7 +323,7 @@ colnames(grupos) <- "Group"
 abundance_long$Group <- rep(grupos$Group, each = nrow(abundance_data))
 ```
 
-Finalmente, crearemos un gráfico con los dos grupos 
+Finalmente, crearemos un gráfico ggplot con los dos grupos, por lo que necesitaremos el paquete `ggplot2`
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 library(ggplot2)
@@ -334,7 +339,7 @@ ggplot(abundance_long, aes(x = Group, y = as.numeric(Abundancia), fill = Group))
   theme_minimal()
 ```
 
-Vemos que, de entre los dos grupos tumorales, parece ser que el grupo PD tiene una abundancia superior (de hecho, es bastante similar, pero parece que el PD tiene 3 valores mucho más altos). 
+Vemos que, de entre los dos grupos tumorales, parece ser que el grupo PD tiene una abundancia superior (de hecho, es bastante similar, pero parece que el PD tiene 4 valores mucho más altos). 
 
 Para poder ver los datos estadísticos descriptivos de ambos grupos, usaremos el paquete `dplyr`, creando un dataframe con la media, la mediana, la desviación estaándar y el ratio intercuartílico.
 
@@ -357,7 +362,8 @@ print(abundance_stats)
 
 Como ya veíamos en el gráfico original de los grupos tumorales, la media y la mediana de PD es superior a la del grupo MSS. Del mismo modo, la desviación estándar es superior en el grupo PD, por lo que los valores están más dispersos respecto a la media (tiene una mayor variabilidad), y el IQR superior indica que la mitad cenral de los datos es más dispersa (hay más diferencia entre el Q1 y el Q3).
 
-Como ya tenemos los datos de la muestra en `abundance_long`, solo deemos crear el boxplot en base a esos datos, con las muestras (MSS y PD) en base a su abundancia. Además, como tenemos 12 muestras, inclinamos las etiquetas del eje X para facilitar su lectura.
+Como ya tenemos los datos de la muestra en `abundance_long`, solo debemos crear el boxplot en base a esos datos, con las muestras (MSS y PD) en base a su abundancia. Además, como tenemos 12 muestras, inclinamos las etiquetas del eje X para facilitar su lectura.
+
 
 ```{r}
 ggplot(abundance_long, aes(x = Muestra, y = Abundancia)) +
@@ -373,12 +379,13 @@ ggplot(abundance_long, aes(x = Muestra, y = Abundancia)) +
 
 Como sabemos, las muestras M1, M5 y T49 son del grupo MSS, mientras que las muestras M42, M43 y M64 son del grupo PD. En el gráfico, vemos que las muestras de MSS tienen valores inferiores, excepto la muestra T49, que parece tener unos valores más altos. En cambio, en PD, vemos que todas las muestras parecen tener valores superiores a MSS, lo que explicaría la diferencia de medias. 
 
-Para profundizar con el análisis de los datos, evaluaremos los componentes principales (PCA), ya que nos pueden proporcionar datos relevantes, así como permitirnos identificaar outliers que desvían el patrón general de los datos. Un paso previo a realizar en un análisis de PCA es normalizar los datos. En este caso, obviaremos este proceso, ya que como se explica en la introducción, estas lecturas ya han sido normalizadas previamente. 
+## 3.3 Análisis de los Componentes Principales (PCA)
+
+Para profundizar con el análisis de los datos, realizaremos un análisis de los componentes principales (PCA), ya que nos pueden proporcionar datos relevantes, así como permitirnos identificaar outliers que desvían el patrón general de los datos. Un paso previo a realizar en un análisis de PCA es normalizar los datos. En este caso, obviaremos este proceso, ya que como se explica en la introducción, estas lecturas ya han sido normalizadas previamente. 
 
 ```{r}
 # Extraer los conteos y calcular la varianza de todos los datos de abundancia
-counts <- assay(se, "counts")
-filtered_counts <- counts[, apply(counts, 2, var) > 0]
+filtered_counts <- counts[, apply(abundance_data, 2, var) > 0]
 fosfo_variances <- apply(filtered_counts, 1, var)
 
 # Filtramos los genes con baja varianza
@@ -402,7 +409,8 @@ ggplot(pca_data, aes(x = PC1, y = PC2, color = Group)) +
   theme(legend.position = "top")
 
 ```
-Vemos que, en el caso del grupo MSS, se ve mucho más representad por la componente principal 2, mientras que el grupo PD se ve mucho más representado por la componente principal 1. Aun así, debemos tener en cuenta que cada componente principal representa cierta cantidad de la variabilidad de los datos. 
+
+Vemos que, en el caso del grupo MSS, se ve mucho más representada por la componente principal 2, mientras que el grupo PD se ve mucho más representado por la componente principal 1. Aun así, debemos tener en cuenta que cada componente principal representa cierta cantidad de la variabilidad de los datos. 
 
 Para determinar que grado de variabilidad se representacon cada PCA, reuniremos los datos en un nuevo dataframe. Como ya calculamos los PCA anteriormente, obtendremos primero las varianzas de cada componente (`variances`), así como la proporción de varianza explicada. 
 
@@ -522,6 +530,9 @@ grupos <- colData(se)$Group
 abundancias_df <- as.data.frame(t(abundancias))  
 abundancias_df$grupo <- grupos
 ```
+
+## 3.4 Análisis ANOVA de los fosfopéptidos
+
 Además, debemos tener en cuenta que no podemos aplicar un ANOVA a cada fosfopéptido independientemente, por lo que usaremos sapply para repetir el proceso en todas las columnas (ahora la variable fosfopéptido) y guardaremos el resultado en anova_results.
 
 ```{r}
@@ -543,6 +554,9 @@ anova_results$p_adjusted <- p.adjust(anova_results$p_value, method = "fdr")
 significativos <- subset(anova_results, p_adjusted < 0.05)
 summary(significativos)
 ```
-Después del test anova en todos los fosfopéptidos vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas entre los grupos MSS y PD. 
+
+Después del test anova en todos los fosfopéptidos vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
+
+Para asegurar la validez de los resultados, se podrían realizar análisis de validación cruzada o validar lo hallazgos utilizando un conjunto de datos independiente. Esto permitiría confirmar que los fosfopéptidos identificados son consistentes y reproducibles en otros conjuntos de datos o experimentos. 
 
 Toda la documentación se ha recopilado en el siguiente repositorio de github: *https://github.com/dcamacmon/Camacho-Monta-o-Daniel-PEC1*
