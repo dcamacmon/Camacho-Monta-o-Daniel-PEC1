@@ -150,20 +150,22 @@ markdown_content <- "
 # Metadatos del Dataset de Fosfoproteómica
 
 ## Descripción General
-Este documento describe los metadatos asociados al dataset de fosfoproteómica utilizado en el análisis. El dataset incluye información sobre las modificaciones post-traduccionales de secuencias peptídicas en diferentes grupos tumorales.
+Este documento describe los metadatos asociados al dataset de fosfoproteómica utilizado en 
+el análisis.El dataset incluye información sobre las modificaciones post-traduccionales de 
+secuencias peptídicas en diferentes grupos tumorales.
 
 ## Estructura del Dataset
 El dataset consta de las siguientes columnas:
 
-| Columna                     | Descripción                                                 |
-|-----------------------------|-------------------------------------------------------------|
-| `SequenceModifications`     | Tipo de modificaciones en la secuencia y ubicación.        |
-| `Accession`                 | Identificador de la secuencia.                             |
-| `Description`               | Descripción de la secuencia analizada.                     |
-| `Score`                     | Score que evalúa la confiabilidad de la identificación.    |
-| `CLASS`                     | Clase de la muestra (H o C).                               |
-| `PHOSPHO`                   | Aminoácido donde ocurre la fosforilación (Y, S/T).      |
-| `Group`                     | Grupo tumoral (MSS o PD).                                  |
+| Columna                   | Descripción                                               |
+|---------------------------|-----------------------------------------------------------|
+| `SequenceModifications`   | Tipo de modificaciones en la secuencia y ubicación.       |
+| `Accession`               | Identificador de la secuencia.                            |
+| `Description`             | Descripción de la secuencia analizada.                    |
+| `Score`                   | Score que evalúa la confiabilidad de la identificación.   |
+| `CLASS`                   | Clase de la muestra (H o C).                              |
+| `PHOSPHO`                 | Aminoácido donde ocurre la fosforilación (Y, S/T).        |
+| `Group`                   | Grupo tumoral (MSS o PD).                                 |
 
 
 ## Información sobre los Grupos
@@ -171,7 +173,8 @@ El dataset consta de las siguientes columnas:
 - **Grupo PD**: Incluye las muestras M42, M43 y M64.
 
 ## Consideraciones
-- Las columnas `CLASS` y `PHOSPHO` son categóricas y pueden ser convertidas a factores para análisis estadísticos.
+- Las columnas `CLASS` y `PHOSPHO` son categóricas y pueden ser convertidas a factores para 
+análisis estadísticos.
 "
 
 
@@ -228,32 +231,34 @@ print(resultados_levene)
 
 Vemos que el test de homogeneidad de varianzas acepta la hipótesis nula, por lo que podemos asumir que no hay una variabiliadd significativa entre ambas lecturas. 
 
-Para obtener el resultado de test de Levene para todas las réplicas, primero crearemos un nuevo dataframe vacío que contendrá el resultado del test. Seguidamente, iteraremos las muestras en que el sufijo "_MSS" o "_PD" indicará el grupo, y el sufijo "_1" o "_2" indicará la réplica. 
-
-Entonces, ejecutaremos un bucle `if else`, en que se verifica si existe una columna MSS (if, col1 y col2) o PD (else, col3 o col4) y comparará los datos de la varianza de la réplica 1 (_1) respecto a la réplica 2 (_2)
+Para obtener el resultado de test de Levene para todas las réplicas, primero crearemos un nuevo dataframe vacío que contendrá el resultado del test, tanto el p-valor como el identificador de la muestra.
 
 ```{r}
-# Obtener los nombres de las columnas para las réplicas
 abundance_data<-assay(se, "counts")
-muestras <- c("M1", "M5", "T49", "M42", "M43", "M64")
+muestras <- c("M1", "M5", "T49", "M42", "M43", "M64") # Obtener los nombres de las columnas para las réplicas
+
 resultados_levene <- data.frame(Muestra = character(),
                                 p_valor = numeric(),
                                 stringsAsFactors = FALSE)
+```
 
-# Iterar sobre las muestras
+Seguidamente, iteraremos las muestras en que el sufijo "_MSS" o "_PD" indicará el grupo, y el sufijo "_1" o "_2" indicará la réplica. Entonces, ejecutaremos un bucle `if else`, en que se verifica si existe una columna MSS (if, col1 y col2) o PD (else, col3 o col4) y evaluará los datos de la varianza de la réplica 1 (_1) respecto a la réplica 2 (_2) con el test de Levene. Finalmente, guardará los datos en el dataframe que hemos creado anteriormente (vacío hasta el momento).
+
+```{r}
+# Empezamos por iterar sobre las muestras
 for (muestra in muestras) {
-  # Definir los nombres de las columnas de las réplicas MSS
+  # Definimos los nombres de las columnas de las réplicas de MSS
   col1 <- paste0(muestra, "_1_MSS")
   col2 <- paste0(muestra, "_2_MSS")
   
-  # Definir los nombres de las columnas de las réplicas PD
+  # Definimos los nombres de las columnas de las réplicas  dePD
   col3 <- paste0(muestra, "_1_PD")
   col4 <- paste0(muestra, "_2_PD")
   
-  # Verificar si ambas columnas MSS existen
+  # Verificamos si ambas columnas MSS existen
   if (col1 %in% colnames(abundance_data) & col2 %in% colnames(abundance_data)) {
-    # Extraer las abundancias de las dos réplicas MSS
-    abundancias <- abundance_data[, c(col1, col2)]
+    
+    abundancias <- abundance_data[, c(col1, col2)]# Extraemos las abundancias de las dos réplicas MSS
     # Crear un dataframe para el test de Levene
     datos <- data.frame(
       Abundancia = c(abundancias[, 1], abundancias[, 2]),
