@@ -383,36 +383,42 @@ Como sabemos, las muestras M1, M5 y T49 son del grupo MSS, mientras que las mues
 
 Para profundizar con el análisis de los datos, realizaremos un análisis de los componentes principales (PCA), ya que nos pueden proporcionar datos relevantes, así como permitirnos identificaar outliers que desvían el patrón general de los datos. Un paso previo a realizar en un análisis de PCA es normalizar los datos. En este caso, obviaremos este proceso, ya que como se explica en la introducción, estas lecturas ya han sido normalizadas previamente. 
 
+Primero crearemos un nuevo objeto con los daos de las abundancias con varianza diferente a 0 (ya que los valores con varianza 0 son constantes, no aportan información relevante al análisis). Para poder aplicar el mismo procedimiento a todas las filas, emplearemos la función `apply`. Seguidamente, filtraremos aquellos datos que tengan una varianza inferior a 0.01
+
 ```{r}
-# Extraer los conteos y calcular la varianza de todos los datos de abundancia
+# Extraemos los datos de abundancia y calculamos la varianza de todos los datos de abundancia
 filtered_counts <- counts[, apply(abundance_data, 2, var) > 0]
 fosfo_variances <- apply(filtered_counts, 1, var)
 
-# Filtramos los genes con baja varianza
+# Filtramos los genes con baja varianza, con un umbral a 0.01
+filtered_counts <- filtered_counts[fosfo_variances > 1e-2, ] 
+```
 
-filtered_counts <- filtered_counts[fosfo_variances > 1e-2, ]  # Ajustamos el umbral a 0.01
+A continuación, realizaremos el PCA y crearemos el data frame con los resultados. Además, cabe destacar la necesidad de transponer los datos de los fosfopéptidos para que se encuentren en las columnas (hasta ahora se han encontrado en las filas). El PCA se centrará y escalará los datos, lo que es recomendable para asegurar que todas las variables contribuyan de manera equitativa al análisis. También añadiremos la información de los grupos (MSS o PD), lo que facilitará la lectura de los datos en función de los grupos.
 
-# Realizamos el PCA y creamos el dataframe
+```{r}
 pca_result <- prcomp(t(filtered_counts), center = TRUE, scale. = TRUE)
 pca_data <- as.data.frame(pca_result$x)
 
 # Agregamos información de grupo
 pca_data$Group <- colData(se)$Group
+```
 
-# Visualizamos los resultados de PCA
+Finalmente, para analizar visualmente la distribución, realizaremos un gráfico con el paquete ggplot2.
+
+```{r}
 ggplot(pca_data, aes(x = PC1, y = PC2, color = Group)) +
   geom_point(size = 3) +
-  labs(title = "Análisis de Componentes Principales",
+  labs(title = "Análisis de Componentes Principales 1 y 2",
        x = "Componente Principal 1",
        y = "Componente Principal 2") +
   theme_minimal() +
   theme(legend.position = "top")
-
 ```
 
 Vemos que, en el caso del grupo MSS, se ve mucho más representada por la componente principal 2, mientras que el grupo PD se ve mucho más representado por la componente principal 1. Aun así, debemos tener en cuenta que cada componente principal representa cierta cantidad de la variabilidad de los datos. 
 
-Para determinar que grado de variabilidad se representacon cada PCA, reuniremos los datos en un nuevo dataframe. Como ya calculamos los PCA anteriormente, obtendremos primero las varianzas de cada componente (`variances`), así como la proporción de varianza explicada. 
+Para determinar que grado de variabilidad se representacon cada PCA, reuniremos los datos en un nuevo dataframe. Como ya calculamos los CP anteriormente, obtendremos primero las varianzas de cada componente (`variances`), así como la proporción de varianza explicada. 
 
 ```{r}
 # Ver la proporción de varianza explicada
@@ -426,71 +432,72 @@ pca_summary <- data.frame(
 )
 ```
 
-En el data frame creado, tenemos una columna con el nombre de las PC y con su varianza, pero no tenemos el formato correcto (modificaremos el resultado para que se vea en base a 100 y no en notación científica) y no tenemos la varianza acumulada (crearemos la columna `CumulativeVariance`).
+En el data frame creado, tenemos una columna con el nombre de las PC y con su varianza, pero no tenemos el formato correcto, así que modificaremos el resultado para que se vea en base a 100 y no en notación científica. Además, no tenemos la varianza acumulada, por lo que crearemos la columna `CumulativeVariance`. Recordemos que, las CP se ordenan automáticamente por orden descendente en función de la variabilidad explicada, por lo que las primeras CP representarán gran parte de la variabilidad.
 
 ```{r}
 #Modificamos el formato de los datos de Variance, así como la nueva columna acumulada.
 pca_summary$Variance<-format(pca_summary$Variance, nsmall = 4, scientific = FALSE)
-pca_summary$Variance <- round(as.numeric(pca_summary$Variance), 4)
-pca_summary$CumulativeVariance <- cumsum(pca_summary$Variance)
+pca_summary$Variance <- round(as.numeric(pca_summary$Variance), 4) #Redondeamos a 4 decimales
+pca_summary$CumulativeVariance <- cumsum(pca_summary$Variance) #Creamos la varianza acumulada
 
 # Mostrar la proporción de varianza explicada
 print(pca_summary)
 ```
 
-Vemos, entonces, que las dos componentes principales contienen el `r pca_summary$CumulativeVariance [2]`% de la variablidad total. Esta variablidad es importante, y usar únicamente 2 CP podría simplificar el análisis. Aún así, usaremos 3 CP, que contendrán el `r pca_summary$CumulativeVariance [3]`% de la variablidad total.
+Vemos, entonces, que las dos componentes principales contienen el `r pca_summary$CumulativeVariance [2]`% de la variablidad total. Esta variablidad es importante, y usar únicamente 2 CP podría simplificar el análisis. Aún así, usaremos 3 Compontentes Principales, que contendrán el `r pca_summary$CumulativeVariance [3]`% de la variablidad total.
 
-De todos modos, aún conociendo la variabilidad asociada a los CP, desconocemos que fosfopéptidos influyen más en cada CP. En `rotation`de PCA, podemos ver que carga supone sobre las CP (nos centraremos en las 3 primeras, pero por separado)
-
-Primero, obtendremos los resultados en `cargas` y crearemos un data frame con estos mismos datos. 
-
-Posteriormente, seguiremos un proceso en que extraeremos los 50 valores con cargas más alta, reordenando por cada CP (en cada CP habrá diferentes fosfopéptidos que afecten con mayor intensidad). Finalmente crearemos un gráfico de barras en que veamos como afectan cada uno de esos 50 resultados a la CP.
+De todos modos, aún conociendo la variabilidad asociada a los CP, desconocemos que fosfopéptidos influyen más en cada CP. En `rotation`de PCA, podemos ver que carga supone sobre las CP (nos centraremos en las 3 primeras, pero por separado). Primero, tendremos que cargar el paquete `tibble`.
 
 ```{r}
 library(tibble)
 ```
 
+Después, obtendremos los resultados en `cargas` y crearemos un data frame con los datos de las CP1, CP2 y CP3. 
 
 ```{r}
-#Obtenemos los datos de las cargas para las tres primeras CP
 cargas <- pca_result$rotation
 cargas_df <- as.data.frame(cargas[, c("PC1", "PC2","PC3")])
 cargas_df <- cargas_df %>%
   rownames_to_column(var = "Fosfopeptido")
+```
 
-#Reordenamos los datos en función de CP1
+Posteriormente, seguiremos un proceso en que extraeremos los 30 valores con cargas más alta, reordenando por cada CP (en cada CP habrá diferentes fosfopéptidos que afecten con mayor intensidad). 
 
+```{r}
 top_cargas_pc1 <- cargas_df %>%
   arrange(desc(PC1)) %>%
   head(30)
 top_cargas_pc1$Fosfopeptido <- factor(top_cargas_pc1$Fosfopeptido, 
                                       levels = top_cargas_pc1$Fosfopeptido)
+```
 
+Finalmente crearemos un gráfico de barras en que veamos como afectan cada uno de esos 30 resultados a la componente principal 1. Tendremos, en orden descendiente, los 30 fosfopéptidos que más influyen en esta CP,
 
-ggplot(top_cargas_pc1, aes(x = Fosfopeptido, y = PC1)) +
+```{r}
+p1<-ggplot(top_cargas_pc1, aes(x = Fosfopeptido, y = PC1)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(title = "Top 30 fosfopeptidos/modificaciones asociadas a PC1",
+  labs(title = "Top 30 fosfopeptidos en PC1",,
        x = "Fosfopeptido/Modificación", y = "Carga en PC1") +
   theme_minimal() +
   theme(axis.text.y = element_text(size = 3, angle = 0, hjust = 1))  # Tamaño y ángulo
 ```
 
-Realizaremos el mismo proceso para CP1:
+Realizaremos el mismo proceso para CP2:
 
 ```{r}
-
+#Reordenamos los datos en función de CP2
 top_cargas_pc2 <- cargas_df %>%
   arrange(desc(PC2)) %>%
   head(30)
 top_cargas_pc2$Fosfopeptido <- factor(top_cargas_pc2$Fosfopeptido, 
                                       levels = top_cargas_pc2$Fosfopeptido)
 
-
-ggplot(top_cargas_pc2, aes(x = Fosfopeptido, y = PC2)) +
+#Creación del gráfico
+p2<-ggplot(top_cargas_pc2, aes(x = Fosfopeptido, y = PC2)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(title = "Top 30 fosfopeptidos/modificaciones asociadas a PC2",
+  labs(title = "Top 30 fosfopeptidos en PC2",
        x = "Fosfopeptido/Modificación", y = "Carga en PC2") +
   theme_minimal() + # Tamaño y ángulo
   theme(axis.text.y = element_text(size = 3, angle = 0, hjust = 1))   
@@ -507,14 +514,21 @@ top_cargas_pc3 <- cargas_df %>%
 top_cargas_pc3$Fosfopeptido <- factor(top_cargas_pc3$Fosfopeptido, 
                                       levels = top_cargas_pc3$Fosfopeptido)
 
-
-ggplot(top_cargas_pc3, aes(x = Fosfopeptido, y = PC3)) +
+#Creación del gráfico
+p3<-ggplot(top_cargas_pc3, aes(x = Fosfopeptido, y = PC3)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(title = "Top 30 fosfopeptidos/modificaciones asociadas a PC3",
+  labs(title = "Top 30 fosfopeptidos en PC3",
        x = "Fosfopeptido/Modificación", y = "Carga en PC3") +
   theme_minimal() + # Tamaño y ángulo de las etiquetas
   theme(axis.text.y = element_text(size = 3, angle = 0, hjust = 1))  
+
+library(patchwork)
+
+combined_plot <- p1 + p2 + p3 + plot_layout(ncol = 3)
+
+# Mostrar el gráfico combinado
+print(combined_plot)
 ```
 
 Como podemos ver, cada fosfopéptido tiene una influencia diferente en cada CP, aunque en la CP1 los 50 primeros parece que todos tienen una carga similar. 
