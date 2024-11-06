@@ -401,16 +401,6 @@ Primero crearemos un nuevo objeto con los daos de las abundancias con varianza d
 # Extraemos los datos de abundancia y calculamos la varianza de todos los datos de abundancia
 colMeans(abundance_data)  # Debe devolver valores cercanos a 0
 apply(abundance_data, 2, sd)
-
-
-filtered_counts <- counts[, apply(abundance_data, 2, var)]
-filtered_counts <- na.omit(filtered_counts)
-head(filtered_counts)
-
-fosfo_variances <- apply(filtered_counts, 1, var)
-fosfo_variances
-# Filtramos los genes con baja varianza, con un umbral a 0.01
-filtered_counts <- filtered_counts[fosfo_variances > 1e-2, ] 
 ```
 
 A continuación, realizaremos el PCA y crearemos el data frame con los resultados. Además, cabe destacar la necesidad de transponer los datos de los fosfopéptidos para que se encuentren en las columnas (hasta ahora se han encontrado en las filas). El PCA se centrará y escalará los datos, lo que es recomendable para asegurar que todas las variables contribuyan de manera equitativa al análisis. También añadiremos la información de los grupos (MSS o PD), lo que facilitará la lectura de los datos en función de los grupos.
