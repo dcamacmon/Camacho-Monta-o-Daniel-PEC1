@@ -111,10 +111,15 @@ col_metadata <- DataFrame(
 )
 ```
 
+Como no disponemos de una columna en row_data con identificadores, crearemos una nueva columna en los metadatos de las filas denominada peptide_id.
+
+```{r}
+row_data$peptide_id <- rownames(abundances)
+```
+
 Una vez hemos pre-procesado los datos para que tengan el formato adecuado, podemos crear el SummarizedExperiment.
 
 ```{r}
-
 se <- SummarizedExperiment(
   assays = list(counts = as.matrix(abundances)),  # Datos de abundancia como matriz
   rowData = row_data,  # Metadatos para las filas
@@ -160,12 +165,13 @@ El dataset consta de las siguientes columnas:
 | Columna                   | Descripción                                               |
 |---------------------------|-----------------------------------------------------------|
 | `SequenceModifications`   | Tipo de modificaciones en la secuencia y ubicación.       |
-| `Accession`               | Identificador de la secuencia.                            |
+| `Accession`               | Identificador.                                            |
 | `Description`             | Descripción de la secuencia analizada.                    |
 | `Score`                   | Score que evalúa la confiabilidad de la identificación.   |
 | `CLASS`                   | Clase de la muestra (H o C).                              |
 | `PHOSPHO`                 | Aminoácido donde ocurre la fosforilación (Y, S/T).        |
 | `Group`                   | Grupo tumoral (MSS o PD).                                 |
+| `Peptide_id`              | Identificador de la secuencia                             |
 
 
 ## Información sobre los Grupos
@@ -474,10 +480,10 @@ top_cargas_pc1$Fosfopeptido <- factor(top_cargas_pc1$Fosfopeptido,
 Finalmente crearemos un gráfico de barras en que veamos como afectan cada uno de esos 30 resultados a la componente principal 1. Tendremos, en orden descendiente, los 30 fosfopéptidos que más influyen en esta CP,
 
 ```{r}
-p1<-ggplot(top_cargas_pc1, aes(x = Fosfopeptido, y = PC1)) +
+ggplot(top_cargas_pc1, aes(x = Fosfopeptido, y = PC1)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(title = "Top 30 FP en PC1",,
+  labs(title = "Top 30 FP en función de PC1",
        x = "Fosfopeptido/Modificación", y = "Carga en PC1") +
   theme_minimal() +
   theme(axis.text.y = element_text(size = 3, angle = 0, hjust = 1))  # Tamaño y ángulo
@@ -494,16 +500,16 @@ top_cargas_pc2$Fosfopeptido <- factor(top_cargas_pc2$Fosfopeptido,
                                       levels = top_cargas_pc2$Fosfopeptido)
 
 #Creación del gráfico
-p2<-ggplot(top_cargas_pc2, aes(x = Fosfopeptido, y = PC2)) +
+ggplot(top_cargas_pc2, aes(x = Fosfopeptido, y = PC2)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(title = "Top 30 FP en PC2",
+  labs(title = "Top 30 FP en función de PC2",
        x = "Fosfopeptido/Modificación", y = "Carga en PC2") +
   theme_minimal() + # Tamaño y ángulo
   theme(axis.text.y = element_text(size = 3, angle = 0, hjust = 1))   
 ```
 
-Y para PC3:
+Repetiremos el proceso de reordenado y graficamos para PC3:
 
 
 ```{r}
@@ -518,34 +524,28 @@ top_cargas_pc3$Fosfopeptido <- factor(top_cargas_pc3$Fosfopeptido,
 p3<-ggplot(top_cargas_pc3, aes(x = Fosfopeptido, y = PC3)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(title = "Top 30 FP en PC3",
+  labs(title = "Top 30 FP en función de PC3",
        x = "Fosfopeptido/Modificación", y = "Carga en PC3") +
   theme_minimal() + # Tamaño y ángulo de las etiquetas
   theme(axis.text.y = element_text(size = 3, angle = 0, hjust = 1))  
-
-library(patchwork)
-
-combined_plot <- p1 + p2 + p3 + plot_layout(ncol = 3)
-
-# Mostrar el gráfico combinado
-print(combined_plot)
 ```
 
-Como podemos ver, cada fosfopéptido tiene una influencia diferente en cada CP, aunque en la CP1 los 50 primeros parece que todos tienen una carga similar. 
+Como podemos ver, cada fosfopéptido tiene una influencia diferente en cada CP, aunque en la CP1 los 50 primeros parece que todos tienen una carga similar. Tal y como se predecía, los fosfopéptidos no tiene la misma carga para todos los CP, por lo que visualmente no podemos determinar que FP es realmente significativo para diferenciar entre los dos tipos tumorales.
 
-Para continuar con el análisis, realizaremos un ANOVA de un factor para ver si hay diferencias significativas en las abundancias de fosfopéptidos entre los grupos. Como los datos están estructurados con las variables (fosfopéptidos) en las filas y los grupos (MSS o PD) en as columnas, tendremos que transponer los datos de las abundancias.
+## 3.4 Análisis ANOVA de los fosfopéptidos
 
+Para continuar con el análisis, realizaremos un ANOVA de un factor para ver si hay diferencias significativas en las abundancias de fosfopéptidos entre los grupos. Como los datos están estructurados con las variables (fosfopéptidos) en las filas y los grupos (MSS o PD) en las columnas, tendremos que transponer los datos de las abundancias.
 
 ```{r}
-abundancias <- assay(se)
+abundancias <- assay(se, "counts")
 grupos <- colData(se)$Group
 
 #Para tener las lecturas en horizontal y los fosfopéptidos en vertical
 abundancias_df <- as.data.frame(t(abundancias))  
-abundancias_df$grupo <- grupos
+abundancias_df$peptide_id <- t(rowData(se)$peptide_id)
+abundancias_df$grupo <- as.factor(abundancias_df$grupo)
+head(abundancias_df)
 ```
-
-## 3.4 Análisis ANOVA de los fosfopéptidos
 
 Además, debemos tener en cuenta que no podemos aplicar un ANOVA a cada fosfopéptido independientemente, por lo que usaremos sapply para repetir el proceso en todas las columnas (ahora la variable fosfopéptido) y guardaremos el resultado en anova_results.
 
@@ -557,7 +557,7 @@ anova_results <- apply(abundancias_df[, -ncol(abundancias_df)], 2, function(y) {
 })
 ```
 
-Finalmente, crearemos un data frame con los resultados, con la información de los fofopéptidos y filtraremos solo aquellos que tengan un p-valor significativo. Además, 
+Finalmente, crearemos un data frame con los resultados, con los resultados del test ANOVA para los fofopéptidos y filtraremos solo aquellos que tengan un p-valor significativo con la función `subset()`. Finalmente, evaluaremos la estructura del data frame para estudiar los FP que han resultado significativos.
 
 ```{r}
 anova_results <- data.frame(Fosfopeptido = names(anova_results), 
@@ -566,10 +566,16 @@ anova_results <- data.frame(Fosfopeptido = names(anova_results),
 anova_results$p_adjusted <- p.adjust(anova_results$p_value, method = "fdr")
 
 significativos <- subset(anova_results, p_adjusted < 0.05)
-summary(significativos)
+str(significativos$Fosfopeptido)
+```
+Después del test ANOVA vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
+
+Para poder determinar patrones diferenciales, podríamos estudiar la posibilidad de patrones entre la fosforilación de Y o de S/T, información contenida en los metadatos (col(Data))
+
+```{r}
+
 ```
 
-Después del test anova en todos los fosfopéptidos vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
 
 Para asegurar la validez de los resultados, se podrían realizar análisis de validación cruzada o validar lo hallazgos utilizando un conjunto de datos independiente. Esto permitiría confirmar que los fosfopéptidos identificados son consistentes y reproducibles en otros conjuntos de datos o experimentos. 
 
