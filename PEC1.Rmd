@@ -229,16 +229,16 @@ El mensaje de retorno `[1] 0` indica que los comandos se ejecutaron correctament
 
 ## 3.1 Estudio de la varianza entre réplicas
 
-Con el SE, podremos visualizar los datos para entender su distribución y variabilidad. Tenemos dos grupos principales (las clases tumorales), pero dentro de cada grupo podemos clasificar 3 muestras en cada uno. 
+Con el objeto `SummarizedExperiment` (SE) podemos visualizar los datos para comprender su distribución y variabilidad. Existen dos grupos principales (los tipos tumorales), y dentro de cada grupo se clasifican tres muestras.
 
-Como tenemos dos réplicas de cada muestra, debemos analizar si la varianza es significativa entre ambas lecturas, ya que dicha diferencia podría estar causada por un error de la técnica o la recolección de datos. Usaremos el paquete `car`y analizaremos M1 (M1_1 y M1_2). 
+Dado que cada muestra tiene dos réplicas, analizaremos si la varianza entre ambas es significativa. Esto es importante, ya que una diferencia en la varianza podría deberse a errores técnicos o a la recolección de datos. Para este análisis, utilizaremos el paquete `car`, comenzando con un estudio en la muestra M1 (réplicas M1_1 y M1_2).
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 library(car)
 abundancias_M1 <- abundances[, c("M1_1_MSS", "M1_2_MSS")]
 ```
 
-Crearemos un nuevo data frame con solo los datos de M1, con los datos de la abundancia (tanto de la réplica 1 y la réplica 2), y con la información de qué replica como factor de dos niveles. A continuación, visualizaremos las 6 primeras observaciones, así como la estructura de los datos.
+Crearemos un data.frame con los datos de abundancia de M1, incorporando ambas réplicas y añadiendo un factor de dos niveles para diferenciarlas. A continuación, visualizaremos las primeras seis observaciones (`head()`) y la estructura de los datos (`str()`).
 
 ```{r}
 # Crear un dataframe con los nombres de las columnas adecuados
@@ -249,27 +249,26 @@ datos_M1 <- data.frame(
 head(datos_M1)
 str(datos_M1)
 ``` 
-Finalmente, realizaremos el test de varianzas levene entre las dos réplicas.
+Realizamos el test de Levene para verificar la homogeneidad de varianzas entre ambas réplicas.
 
 ```{r}
 resultados_levene <- leveneTest(Abundancia ~ Replica, data = datos_M1)
 print(resultados_levene)
 ```
-
 Vemos que el test de homogeneidad de varianzas acepta la hipótesis nula, por lo que podemos asumir que no hay una variabiliadd significativa entre ambas lecturas. 
 
 Para obtener el resultado de test de Levene para todas las réplicas, primero crearemos un nuevo dataframe vacío que contendrá el resultado del test, tanto el p-valor como el identificador de la muestra.
 
+No obstante, para realizar una comparación a tal escala, primero deberiamos escalar los datos, de manera que sus varianzas sean comparables. Para ello, escalaremos utilizando el método de Z-score, por lo que los datos seran transformados, restando la media de cada variable y dividiendo por su desviación estándar.
+
 ```{r}
 abundance_data<-assay(se, "counts")
 abundance_data <- scale(abundance_data)
+summary(abundance_data)
+```
+Con los datos transformados, procederemos a crear el dataframe para contener los resultados del test de levene para todas las muestras. Como conocemos los nombres de dichas muestras, los contendremos en un nuevo objeto.
 
-
-
-
-
-
-
+```{r}
 # Obtenemos los nombres de las columnas para las réplicas
 muestras <- c("M1", "M5", "T49", "M42", "M43", "M64") 
 
@@ -278,7 +277,7 @@ resultados_levene <- data.frame(Muestra = character(),
                                 stringsAsFactors = FALSE)
 ```
 
-Seguidamente, iteraremos las muestras en que el sufijo "_MSS" o "_PD" indicará el grupo, y el sufijo "_1" o "_2" indicará la réplica. Entonces, ejecutaremos un bucle `if else`, en que se verifica si existe una columna MSS (if, col1 y col2) o PD (else, col3 o col4) y almacenará las abundancias. Seguidamente, se evaluarán los datos de la varianza de la réplica 1 (_1) respecto a la réplica 2 (_2) con el test de Levene. Finalmente, guardará los datos en el dataframe que hemos creado anteriormente (vacío hasta el momento).
+Luego iteramos a través de cada muestra, donde los sufijos "_MSS" o "_PD" indican el grupo, y "_1" o "_2" indican la réplica. Ejecutamos un bucle que verifica la existencia de columnas para las réplicas MSS o PD, evalúa la varianza entre las dos réplicas con el test de Levene y almacena los resultados en el data.frame.
 
 ```{r}
 resultados_levene <- data.frame(Muestra = character(),
@@ -329,15 +328,15 @@ Finalmente, mostramos el resultado de los test de Levene.
 print(resultados_levene)
 ```
 
-Vemos entonces, que hay diferencias significativas en la variablidad entre las réplicas de las muestras de los dos grupos. Esto implica, que no podemos promediar las réplicas, o mantenerlas independientes para los futuros análisis. En este caso, debido a que en los estudios de LC-MS la variabilidad puede mostrar diferencias biológicas subyacentes en las muestras, mantendremos cada réplica como una muestra independiente.
+Vemos entonces, que hay diferencias significativas en la variablidad entre algunas de las réplicas de las muestras de los dos grupos. Una vez escalados, vemos que hay variabilidad en la primera muestra, mientras que en el resto no presenta dicha variabilidad. Esto podría indicar que hay una variabilidad técnica, debido a que el equipo de LC-MS es muy sensible, y cualqueir cambio en las condiciones puede afectar la abundancia medida. 
+
+Esto implica, que pese a que podemos promediar las réplicas de la mayoria de muestras, decidiremos mantenerlas independientes para los futuros análisis, ya que en los estudios de LC-MS la variabilidad puede mostrar diferencias biológicas subyacentes en las muestras.
 
 ## 3.2 Visualización de la distribución
 
-A continuación, mostraremos la distribución de las muestras de la matriz de abundancia. 
+A continuación, mostraremos la distribución de las muestras de la matriz de abundancia.  Al tratar con 12 columnas de datos al mismo tiempo, numéricamente es difícil determinar algun patrón en ellos. Para evaluarlo más gráficamente, realizaremos un boxplot con estos mismos datos.
 
-Al tratar con 12 columnas de datos al mismo tiempo, numéricamente es difícil determinar algun patrón en ellos. Para evaluarlo más gráficamente, realizaremos un boxplot con estos mismos datos.
-
-Primero tendremos que obtener la matriz de abundancias (counts) desde el SE, y convertirla en una matriz de formato largo (usando la función `melt()`) y modificamos los títulos para facilitar su lectura. 
+Primero recuperaremos la matriz de abundancias (`abundance_data`) del SE, y la convertiremos en una matriz de formato largo (usando la función `melt()` del paquete reshape2) y modificamos los títulos para facilitar su lectura. Esta conversión es importante para poder trabajar con futuro paquetes como `ggplot2` y `dplyr`, ya que mejora la legibilidad y simplifica el procesamiento de datos.
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 library(reshape2)
@@ -348,7 +347,7 @@ abundance_long <- melt(abundance_data)
 colnames(abundance_long) <- c("Fosfopéptido", "Muestra", "Abundancia")
 ```
 
-Después, dividiremos los dos grupos tumorales (MSS y PD) y se especificarán correspondientemente.
+Después, dividiremos los dos grupos tumorales (MSS y PD) y se identificarán correspondientemente.
 
 ```{r}
 grupos <- as.data.frame(colData(se)$Group)
@@ -356,7 +355,7 @@ colnames(grupos) <- "Group"
 abundance_long$Group <- rep(grupos$Group, each = nrow(abundance_data))
 ```
 
-Finalmente, crearemos un gráfico ggplot con los dos grupos, por lo que necesitaremos el paquete `ggplot2`
+Finalmente, crearemos un gráfico ggplot con los dos grupos, por lo que necesitaremos el paquete `ggplot2`. Generaremos un gráfico boxplor con dispersión de puntos para visualizar la dsitribución de las abundancias de fosfopéptidos por grupo tumoral en el dataframe transformado (en formato largo). Para evitar que los outliers saturen el gráfico, los eliminaremos del gráfico.
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 library(ggplot2)
@@ -369,13 +368,14 @@ ggplot(abundance_long, aes(x = Group, y = as.numeric(Abundancia), fill = Group))
   labs(title = "Distribución de Abundancias de Fosfopéptidos por Grupo Tumoral",
        x = "Grupo Tumoral",
        y = "Abundancia de Fosfopéptidos") +
-  theme_minimal()
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 0, hjust = 1),  # Rotar etiquetas en el eje x
+        legend.position = "none")
 ```
 
-Vemos que, de entre los dos grupos tumorales, parece ser que el grupo PD tiene una abundancia superior (de hecho, es bastante similar, pero parece que el PD tiene 4 valores mucho más altos). 
+Vemos que, de entre los dos grupos tumorales, parece ser que el grupo PD tiene una abundancia superior (de hecho, es bastante similar, pero parece que el PD tiene ciertos valores mucho más altos). Debido a que hemos especificado cierto grado de transparencia, el hecho de que la base del gráfico se vea tan oscura implica una alta densidad de datos en esa zona.
 
 Para poder ver los datos estadísticos descriptivos de ambos grupos, usaremos el paquete `dplyr`, creando un dataframe con la media, la mediana, la desviación estaándar y el ratio intercuartílico.
-
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 library(dplyr)
@@ -393,7 +393,11 @@ abundance_stats <- abundance_long %>%
 print(abundance_stats)
 ```
 
-Como ya veíamos en el gráfico original de los grupos tumorales, la media y la mediana de PD es superior a la del grupo MSS. Del mismo modo, la desviación estándar es superior en el grupo PD, por lo que los valores están más dispersos respecto a la media (tiene una mayor variabilidad), y el IQR superior indica que la mitad cenral de los datos es más dispersa (hay más diferencia entre el Q1 y el Q3).
+Como ya veíamos en el gráfico original de los grupos tumorales, la media y la mediana de PD es superior a la del grupo MSS, pero con unos valores muy cercanos a 0 en ambos casos. Esto es normal debido a que el Z-Score transforma los datos para que tengan una media de 0 y una desviación estándar de 1 (como vemos en la tabla).
+
+La mediana y SD son similares en ambos grupos, por lo que podemos afirmar que después de la transformación no hay una gran diferencia en la variabilidad de las abundancias entre los dos grupos. El IQR (la diferencia entre el Q1 y el Q3) también es muy similar entre lso dos grupos, lo que indica que la variabilidad dentro de los dos grupos es comparable.
+
+Además, el IQR superior indica que la mitad central de los datos es más dispersa (hay más diferencia entre el Q1 y el Q3).
 
 Como ya tenemos los datos de la muestra en `abundance_long`, solo debemos crear el boxplot en base a esos datos, con las muestras (MSS y PD) en base a su abundancia. Además, como tenemos 12 muestras, inclinamos las etiquetas del eje X para facilitar su lectura.
 
@@ -410,18 +414,21 @@ ggplot(abundance_long, aes(x = Muestra, y = Abundancia)) +
         legend.position = "none")  # Eliminar la leyenda
 ```
 
-Como sabemos, las muestras M1, M5 y T49 son del grupo MSS, mientras que las muestras M42, M43 y M64 son del grupo PD. En el gráfico, vemos que las muestras de MSS tienen valores inferiores, excepto la muestra T49, que parece tener unos valores más altos. En cambio, en PD, vemos que todas las muestras parecen tener valores superiores a MSS, lo que explicaría la diferencia de medias. 
+Como sabemos, las muestras M1, M5 y T49 son del grupo MSS, mientras que las muestras M42, M43 y M64 son del grupo PD. 
+
+En el gráfico, vemos que las las muestras de MSS tienen valores inferiores. En cambio, en PD, vemos que todas las muestras parecen tener valores superiores a MSS, pero no muchos, lo que podría explicar la media ligeramente superior de PD.
 
 ## 3.3 Análisis de los Componentes Principales (PCA)
 
 Para profundizar con el análisis de los datos, realizaremos un análisis de los componentes principales (PCA), ya que nos pueden proporcionar datos relevantes, así como permitirnos identificaar outliers que desvían el patrón general de los datos. Un paso previo a realizar en un análisis de PCA es normalizar los datos. En este caso, obviaremos este proceso, ya que como se explica en la introducción, estas lecturas ya han sido normalizadas previamente. 
 
-Primero crearemos un nuevo objeto con los daos de las abundancias con varianza diferente a 0 (ya que los valores con varianza 0 son constantes, no aportan información relevante al análisis). Para poder aplicar el mismo procedimiento a todas las filas, emplearemos la función `apply`. Seguidamente, filtraremos aquellos datos que tengan una varianza inferior a 0.01
+Primero crearemos un nuevo objeto con los datos de las abundancias con varianza diferente a 0 (ya que los valores con varianza 0 son constantes, no aportan información relevante al análisis). Para poder aplicar el mismo procedimiento a todas las filas, emplearemos la función `apply`. Seguidamente, filtraremos aquellos datos que tengan una varianza inferior a 0.01
 
 ```{r}
 # Extraemos los datos de abundancia y calculamos la varianza de todos los datos de abundancia
 colMeans(abundance_data)  # Debe devolver valores cercanos a 0
-apply(abundance_data, 2, sd)
+variances<-apply(abundance_data, 2, sd)
+abundance_data <- abundance_data[, variances > 0.01]
 ```
 
 A continuación, realizaremos el PCA y crearemos el data frame con los resultados. Además, cabe destacar la necesidad de transponer los datos de los fosfopéptidos para que se encuentren en las columnas (hasta ahora se han encontrado en las filas). El PCA se centrará y escalará los datos, lo que es recomendable para asegurar que todas las variables contribuyan de manera equitativa al análisis. También añadiremos la información de los grupos (MSS o PD), lo que facilitará la lectura de los datos en función de los grupos.
@@ -446,7 +453,7 @@ ggplot(pca_data, aes(x = PC1, y = PC2, color = Group)) +
   theme(legend.position = "top")
 ```
 
-Vemos que, en el caso del grupo MSS, se ve mucho más representada por la componente principal 2, mientras que el grupo PD se ve mucho más representado por la componente principal 1. Aun así, debemos tener en cuenta que cada componente principal representa cierta cantidad de la variabilidad de los datos. 
+Vemos que, en el caso del grupo MSS, se ve mucho más representada por la componente principal 2 (se ven más concentradas arriba), mientras que el grupo PD se ve mucho más representado por la componente principal 1 (se ven más concentradas a la derecha). Aun así, debemos tener en cuenta que cada componente principal representa cierta cantidad de la variabilidad de los datos. 
 
 Para determinar que grado de variabilidad se representacon cada PCA, reuniremos los datos en un nuevo dataframe. Como ya calculamos los CP anteriormente, obtendremos primero las varianzas de cada componente (`variances`), así como la proporción de varianza explicada. 
 
@@ -462,7 +469,9 @@ pca_summary <- data.frame(
 )
 ```
 
-En el data frame creado, tenemos una columna con el nombre de las PC y con su varianza, pero no tenemos el formato correcto, así que modificaremos el resultado para que se vea en base a 100 y no en notación científica. Además, no tenemos la varianza acumulada, por lo que crearemos la columna `CumulativeVariance`. Recordemos que, las CP se ordenan automáticamente por orden descendente en función de la variabilidad explicada, por lo que las primeras CP representarán gran parte de la variabilidad.
+En el data frame creado, tenemos una columna con el nombre de las PC y con su varianza, pero no tenemos el formato correcto, así que modificaremos el resultado para que se vea en base a 100 y no en notación científica. Además, no tenemos la varianza acumulada (únicamente la varianza de cada CP independientemente), por lo que crearemos la columna `CumulativeVariance`. Recordemos que, las CP se ordenan automáticamente por orden descendente en función de la variabilidad explicada, por lo que las primeras CP representarán gran parte de la variabilidad.
+
+Los datos de CP siempre aparecen en notación científica (pese a que hemos especificado anteriormente que queremos un porcentaje). Para una mejor lectura de los datos, modificaremos el formato, redondeando a 4 decimales y creamos la varianza acumulada. 
 
 ```{r}
 #Modificamos el formato de los datos de Variance, así como la nueva columna acumulada.
@@ -482,7 +491,7 @@ De todos modos, aún conociendo la variabilidad asociada a los CP, desconocemos 
 library(tibble)
 ```
 
-Después, obtendremos los resultados en `cargas` y crearemos un data frame con los datos de las CP1, CP2 y CP3. 
+Después, obtendremos los resultados en `cargas` y crearemos un data frame con los datos de las CP1, CP2 y CP3 al que llamaremos `cargas_df`. 
 
 ```{r}
 cargas <- pca_result$rotation
@@ -491,7 +500,9 @@ cargas_df <- cargas_df %>%
   rownames_to_column(var = "Fosfopeptido")
 ```
 
-Posteriormente, seguiremos un proceso en que extraeremos los 30 valores con cargas más alta, reordenando por cada CP (en cada CP habrá diferentes fosfopéptidos que afecten con mayor intensidad). 
+Posteriormente, seguiremos un proceso en que extraeremos los 30 valores con cargas más alta, reordenando de forma descendiente los fosfopéptidos en función de cada CP (en cada CP habrá diferentes fosfopéptidos que afecten con mayor intensidad). 
+
+Realizaremos el mismo proceso para las 3 componentes principales: Reordenamos de manera descendiente todos los fosfopéptidos en función de la CP, obtenemos los 30 valores más altos y los guardamos en el data frame. En el dataframe, determinamos que la columna con los fosfopéptidos sean de tipo factor, y estableceremos que los niveles del factor a partir de los valores de carga de los fosfopéptidos. 
 
 ```{r}
 top_cargas_pc1 <- cargas_df %>%
@@ -501,7 +512,7 @@ top_cargas_pc1$Fosfopeptido <- factor(top_cargas_pc1$Fosfopeptido,
                                       levels = top_cargas_pc1$Fosfopeptido)
 ```
 
-Finalmente crearemos un gráfico de barras en que veamos como afectan cada uno de esos 30 resultados a la componente principal 1. Tendremos, en orden descendiente, los 30 fosfopéptidos que más influyen en esta CP,
+Finalmente crearemos un gráfico de barras en que veamos como afectan cada uno de esos 30 resultados a la componente principal 1. Tendremos, en orden descendiente, los 30 fosfopéptidos que más influyen en esta CP.
 
 ```{r}
 ggplot(top_cargas_pc1, aes(x = Fosfopeptido, y = PC1)) +
@@ -520,10 +531,11 @@ Realizaremos el mismo proceso para CP2:
 top_cargas_pc2 <- cargas_df %>%
   arrange(desc(PC2)) %>%
   head(30)
+#Establecemos los niveles y el tipo factor
 top_cargas_pc2$Fosfopeptido <- factor(top_cargas_pc2$Fosfopeptido, 
                                       levels = top_cargas_pc2$Fosfopeptido)
 
-#Creación del gráfico
+#Creamos del gráfico
 ggplot(top_cargas_pc2, aes(x = Fosfopeptido, y = PC2)) +
   geom_bar(stat = "identity") +
   coord_flip() +
@@ -541,6 +553,7 @@ Repetiremos el proceso de reordenado y graficamos para PC3:
 top_cargas_pc3 <- cargas_df %>%
   arrange(desc(PC3)) %>%
   head(30)
+#Establecemos los niveles y el tipo factor
 top_cargas_pc3$Fosfopeptido <- factor(top_cargas_pc3$Fosfopeptido, 
                                       levels = top_cargas_pc3$Fosfopeptido)
 
@@ -558,8 +571,8 @@ Como podemos ver, cada fosfopéptido tiene una influencia diferente en cada CP, 
 
 ## 3.4 Análisis ANOVA de los fosfopéptidos
 
-Para continuar con el análisis, realizaremos un ANOVA de un factor para ver si hay diferencias significativas en las abundancias de fosfopéptidos entre los grupos. Como los datos están estructurados con las variables (fosfopéptidos) en las filas y los grupos (MSS o PD) en las columnas, tendremos que transponer los datos de las abundancias.
-
+Para continuar con el análisis, realizaremos un ANOVA de un factor para ver si hay diferencias significativas en las abundancias de fosfopéptidos entre los grupos. Como los datos están estructurados con las variables (fosfopéptidos) en las filas y los grupos (MSS o PD) en las columnas, tendremos que transponer los datos de las abundancias. Para poder determinar a que grupo tumorales pertenecen las muestras, necesitaremos los metadatos contenidos en colData.
+ 
 ```{r}
 grupos <- colData(se)$Group
 
@@ -568,7 +581,7 @@ abundancias_df <- as.data.frame(t(abundance_data))
 abundancias_df$grupo <- grupos
 ```
 
-Además, debemos tener en cuenta que no podemos aplicar un ANOVA a cada fosfopéptido independientemente, por lo que usaremos sapply para repetir el proceso en todas las columnas (ahora la variable fosfopéptido) y guardaremos el resultado en anova_results.
+Además, debemos tener en cuenta que no podemos aplicar un ANOVA a cada fosfopéptido independientemente, por lo que usaremos apply para repetir el proceso en todas las columnas (ahora la variable fosfopéptido) y guardaremos el resultado (el p-valor) en anova_results.
 
 ```{r}
 # Función para aplicar ANOVA en cada fosfopéptido
@@ -578,7 +591,7 @@ anova_results <- apply(abundancias_df[, -ncol(abundancias_df)], 2, function(y) {
 })
 ```
 
-Finalmente, crearemos un data frame con los resultados, con los resultados del test ANOVA para los fofopéptidos y filtraremos solo aquellos que tengan un p-valor significativo con la función `subset()`. Finalmente, evaluaremos la estructura del data frame para estudiar los FP que han resultado significativos.
+Finalmente, crearemos un data frame con los resultados, con los resultados del test ANOVA para los fofopéptidos. Además, realizaremos un ajuste de los p-valor obtenidos con el test ANOVA mediante el enfoque de Benjamini-Hochberg, ya que, de esta manera, controlamos la cantidad de falsos positivos.
 
 ```{r}
 anova_results <- data.frame(Fosfopeptido = names(anova_results), 
@@ -587,9 +600,8 @@ anova_results <- data.frame(Fosfopeptido = names(anova_results),
 anova_results$p_adjusted <- p.adjust(anova_results$p_value, method = "fdr")
 
 ```
-Después del test ANOVA vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas (teniendo en cuenta el p_valor ajustado) entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
 
-Para poder determinar patrones diferenciales, podríamos estudiar la posibilidad de patrones entre la fosforilación de Y o de S/T, información contenida en los metadatos (col(Data))
+A continuación, para poder filtrar los fosfopéptidos, primero tendremos que seleccionar los índices que tienen un p-valor ajustado inferior a 0.05 (el valor de  significancia). Con los índices ya guardados, podremos buscar aquellos péptidos contenidos en el SE que correspondan a estos índices. Para poder leer estos datos correctamente, también cargaremos los metadatos asociados a estos péptidos. 
 
 ```{r}
 #Seleccionamos los índices que tienen un p-valor inferior a 0.05
@@ -602,50 +614,42 @@ signif_row_data <- rowData(se)[signif_peptides, ]
 #Mostramos los 6 primeros resultados
 print(head(signif_row_data$SequenceModifications))
 ```
-Ahora que hemos extraído tanto los datos como los metadatos, podemos volver a analizar la distribución, para observar diferencias entre 
+
+Después del test ANOVA vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas (teniendo en cuenta el p_valor ajustado) entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
+
+Para poder determinar patrones diferenciales, podemos estudiar los datos proporcionados por los fosfopéptidos que han resultado significativos. Por lo tanto, primero tendremos que crear un nuevo objeto con solo estos datos. Como conocemos los índices, crearemos un dataframe llamado signif_abundances, el cual escalaremos usando el método de Z-score.
 
 ```{r}
 # Abundancias de fosfopéptidos significativos
 signif_abundances <- assay(se, "counts")[signif_peptides, ]
+save(se, file = "Fosfodatos_se_significativos.Rda") #Guardamos el SE en formato .Rda
+sifnif_abundances <- (scale(signif_abundances))
+```
 
-# Coloca las medias de cada grupo en un data frame
-group_means <- data.frame(
-  MSS_mean = rowMeans(signif_abundances[, colData(se)$Group == "MSS"]),
-  PD_mean = rowMeans(signif_abundances[, colData(se)$Group == "PD"])
-)
+Como posteriormente requeriremos del paquete de ggplot para visualizar el análisis y su distribución, convertiremos los datos a formato largo usando melt(). Para finalizar el preprocesado de datos, añadiremos la información del grupo.
 
-# Calcula la diferencia en medias
-group_means$difference <- group_means$MSS - group_means$PD
-
-library(reshape2)
-library(ggplot2)
-
-# Convierte las abundancias a formato largo
+```{r}
 signif_abundances_long <- melt(signif_abundances)
 colnames(signif_abundances_long) <- c("peptide_id", "Sample", "Abundance")
-
-# Agrega información de grupo
 signif_abundances_long$Group <- colData(se)$Group[signif_abundances_long$Sample]
 
+```
 
+Una vez tenemos los datos filtrados y preprocesados, crearemos un data frame que contenga los metadatos de ambos grupos y calcule las medias de abundancia para cada fosfopéptido en los grupos tumorales.  
 
-
-
-sifnif_abundances <- t(scale(t(signif_abundances)))
-
-# Calcula las medias de abundancia por grupo
+```{r}
 group_means <- data.frame(
   MSS_mean = rowMeans(signif_abundances[, colData(se)$Group == "MSS"]),
   PD_mean = rowMeans(signif_abundances[, colData(se)$Group == "PD"])
 )
+```
 
-# Carga ggplot2 para la visualización
-library(ggplot2)
+Visualizaremos los datos que hemos obtenido, en función de PD y MSS y veremos si, en alguno de los péptidos filtrados, se visualizan patrones claros de diferenciación. Para poder determinar un umbral que "divida" las medias de ambos grupos, añadiremos una línea (geom_abline) que represente la media en relación 1:1 (slope=1) y que pase por las coordenadas de origen. 
 
-# Gráfico de dispersión de abundancias medias
+```{r}
 ggplot(group_means, aes(x = MSS_mean, y = PD_mean)) +
-  geom_point(color = "skyblue", size = 3, alpha = 0.7) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +  # Línea de identidad
+  geom_point(color = "darkorchid", size = 3, alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +  # Línea de identidad
   theme_minimal() +
   labs(
     title = "Comparación de Abundancia Media de Fosfopéptidos Significativos entre MSS y PD",
@@ -654,7 +658,35 @@ ggplot(group_means, aes(x = MSS_mean, y = PD_mean)) +
   )
 ```
 
+Gracias al ggplot podemos ver que, como mínimo, tenemos 2 fosfopéptido que se ve más representado por uno de los grupos tumorales, mientras que la mayoría parecen no reflejar ningún patrón claro respecto a la media de abundancia entre la media de cada grupo.
 
-Para asegurar la validez de los resultados, se podrían realizar análisis de validación cruzada o validar lo hallazgos utilizando un conjunto de datos independiente. Esto permitiría confirmar que los fosfopéptidos identificados son consistentes y reproducibles en otros conjuntos de datos o experimentos. 
+Estas diferencias son bastante claras entre los grupos MSS y PD, por lo que podemos afirmar que (sabiendo que las diferencias son significativas gracias al test ANOVA), tienen diferencias claras entre los grupos MSS y PD, y podría implicar que están asociados con una característica distintiva de cada grupo tumoral.
 
-Toda la documentación se ha recopilado en el siguiente repositorio de github: *https://github.com/dcamacmon/Camacho-Monta-o-Daniel-PEC1*
+# 4. Conclusiones
+
+Con base en el análisis que hemos realizado y la visualización de las abundancias para fosfopéptidos entre los grupos tumorales MSS y PD, podemos extraer las siguientes conclusiones.
+
+El ANOVA de un factor ha identificado 104 fosfopéptidos significativos entre los dos grupos tumorales, lo que sugiere que hay una diferencia en los patrones de fosforilación entre estos dos grupos. Estos fosfopéptidos podrían estar asociados con características moleculares claves que distinguen los dos subtipos tumorales. 
+
+El análisis visual de las abundancias medias de los fosfopéptidos resultantes en el gráfico de dispersión sugiere que existen algunos fosfopéptidos que tienen abundancias significativamente mayores en uno de los grupos. Los puntos alejados de la línea de identidad (que representa igual abundancia entre los dos grupos) indican que estos fosfopéptidos tienen diferencias marcadas en su abundancia entre los subtipos tumorales.
+
+Los 104 fosfopéptidos significativos podrían ser biomarcadores potenciales que diferencian los subtipos tumorales MSS y PD, y podrían estar involucrados en vías de señalización específicas. Si estos biomarcadores son validados en más estudios, podrían tener aplicaciones en diagnóstico, pronóstico o tratamiento para pacientes con estos tipos de tumores. 
+
+Además, la posibilidad de estudiar la fosforilación en sitios especificos (en Y o S/T) podría revelar patrones aún más claros de diferenciación entre los grupos MSS y PD. Los metadatos sobre las modificaciones en los residuos de fosforilación proporcionan información adicional que podría permitir identificar patrones específicos más claros.
+
+Finalmente, para asegurar la validez de los resultados, se podrían realizar análisis de validación cruzada o validar lo hallazgos utilizando un conjunto de datos independiente. Esto permitiría confirmar que los fosfopéptidos identificados son consistentes y reproducibles en otros conjuntos de datos o experimentos.
+
+Toda la documentación se ha recopilado en el siguiente repositorio de github:
+
+```{r include=FALSE}
+# Agregar todos los archivos
+system("git add .")
+
+# Hacer commit de los cambios
+system("git commit -m 'Añadir_archivos'")
+
+# Hacer push para subir los cambios a GitHub
+system("git push origin main") # Asegúrate de que la rama sea correcta
+```
+
+*https://github.com/dcamacmon/Camacho-Monta-o-Daniel-PEC1*
