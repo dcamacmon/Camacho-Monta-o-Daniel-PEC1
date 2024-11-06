@@ -16,40 +16,43 @@ knitr::opts_knit$set(root.dir = "C:/Users/danie/Camacho-Monta-o-Daniel-PEC1")
 
 El presente análisis se basa en un conjunto de datos de fosfoproteómica obtenido a partir de un experimento que investigó dos subtipos tumorales diferentes utilizando modelos de xenoinjertos derivados de pacientes (PDX). Las muestras fueron enriquecidas con fosfopéptidos y luego analizadas mediante espectrometría de masas acoplada a cromatografía líquida (LC-MS) en condiciones de duplicados técnicos, lo que permitió medir las abundancias normalizadas de señales MS de aproximadamente 1,400 fosfopéptidos.
 
-El objetivo principal de este análisis es identificar fosfopéptidos que puedan diferenciar entre los dos grupos tumorales mediante el uso de métodos estadísticos y visualizaciones gráficas. Los datos proporcionados están organizados en un archivo de Excel, denominado TIO2+PTYR-human-MSS+MSIvsPD.XLSX, donde la columna SequenceModifications contiene las modificaciones y sus ubicaciones en los péptidos.
+El objetivo principal de este análisis es identificar fosfopéptidos que puedan diferenciar entre los dos grupos tumorales mediante el uso de métodos estadísticos y visualizaciones gráficas. Los datos proporcionados están organizados en un archivo de Excel, denominado "*TIO2+PTYR-human-MSS+MSIvsPD.XLSX*".
 
 Los dos grupos tumorales se definen como:
 
-* Grupo MSS: Incluye las muestras M1, M5 y T49.
-* Grupo PD: Incluye las muestras M42, M43 y M64.
+* **Grupo MSS**: Incluye las muestras M1, M5 y T49.
+* **Grupo PD**: Incluye las muestras M42, M43 y M64.
 
-Antes de empezar a trabajar, tendremos que crear un directorio git, en el que guardaremos todos los datos que vayamos generando. Los repositorios de gitHUB ofrece múltiples beneficios para el desarrollo de software, ya que facilita el control de versiones, permitiendo realizar un seguimiento de cambios y colaborar con otros de manera eficiente. Su interfaz intuitiva y herramientas de gestión de proyectos mejoran la comunicación entre equipos.
+Antes de comenzar a trabajar, será necesario crear un repositorio en Git para guardar todos los datos generados durante el análisis. Los repositorios de GitHub ofrecen múltiples beneficios para el desarrollo de software, como el control de versiones, que permite realizar un seguimiento de los cambios y colaborar de manera eficiente. Además, su interfaz intuitiva y herramientas de gestión de proyectos mejoran la comunicación entre los equipos.
 
-En gitHUB, podemos crear directamente el nuevo repositorio, al que llamaremos "Camacho-Montan-o-Daniel-PEC1", y el cual estará vinculado con nuestra carpeta en el terminal local, de manera que, al actualizar nuestros datos, podremos actualizar el repositorio al momento.
+En GitHub, podemos crear directamente el repositorio, al que llamaremos "Camacho-Montan-o-Daniel-PEC1". Este repositorio estará vinculado a nuestra carpeta local, de manera que, al actualizar los datos, podremos sincronizar los cambios con el repositorio de forma inmediata.
 
-Para crearlo, primero tendremos que inicializar el repositorio (`git init`), y configuraremos nuestros datos del directorio de gitHUB. 
+Para crear el repositorio, primero debemos inicializarlo (`git init`) y configurar nuestros datos en GitHub (nombre de usuario y correo electrónico).. 
 
-```{r}
+```{r results = "hide"}
 system("git init")  # Inicializa un nuevo repositorio de Git
 system("git config --global user.name 'Daniel Camacho'")
 system("git config --global user.email 'dcamacmon@uoc.edu'")
 
 ```
 
-Las respuestas de 0, indican que no ha habido ningún problema al generar dichas configuraciones. A continuación, tendremos que vincular el repositorio local con el repostorio remoto.
+En caso de no haber problemas, se generarán dichas configuraciones en el repositorio. A continuación, tendremos que vincular el repositorio local con el repostorio remoto. Con el siguiente comando primero asignaremos la URL del repositorio remoto a la variable `repo_url`, y es la que se utilizará para vincular el repositorio local con el repositorio remoto.
+
+Además, con system() ejecutaremos una instrucción de git en el sistema operativo desde R. Paste creará una cadena que combinará el comando de `git remote add origin` con la URL del repositorio remoto, lo que permitirá enviar cambios al repositorio de GitHUB.
 
 ```{r}
 repo_url <- "https://github.com/dcamacmon/Camacho-Monta-o-Daniel-PEC1"
 system(paste("git remote add origin", repo_url))
 ```
-Con la respuesa afirmativa, podemos aceptar que el directorio remoto se ha vinculado correctamente al local, por lo que podemos empezar a trabajar.
+Con la respuesta afirmativa, podemos confirmar que el directorio remoto se ha vinculado correctamente al directorio local, y podremos comenzar a trabajar.
 
 # 2. Lectura de los datos 
 
 Para iniciar con el estudio de los datos, primero debemos cargar la información del dataset de metabolómica desde github. El archivo, al tratarse de XLSM, usaremos el paquete `readxl` y cargaremos la información directamente desde el repositorio remoto. 
 
-Como importamos los datos desde un directorio web, primero debemos crear un archivo temporal con la extensions .xlsx (`temp_file`) y descargar el archivo desde la URL (`download.file()`) y finalmente cargar los datos en nuestro data frame (`read_excel()`). Con 
+Como estamos importando los datos desde un directorio web, primero crearemos un archivo temporal con la extensión `.xlsx` (llamado `temp_file`), luego descargaremos el archivo desde la URL (`download.file()`) y finalmente cargaremos los datos en nuestro data frame con la función `read_excel()`.
 
+En este caso, como la dirección URL del repositorio original es muy extensa, tendremos que dividirla y posteriormente pegarla con paste0(). 
 
 ```{r load-data-part1, echo=TRUE}
 library(readxl)
@@ -62,21 +65,23 @@ download.file(url, temp_file, mode = "wb") #Descarga del archivo desde el reposi
 fosfo_data <- read_excel(temp_file) #Cargamos el documento 
 ```
 
-Con el archivo ya cargado, podemos ver su estructura con `str()`.
+Con el archivo ya cargado, podemos ver una dsitribución generalizada de los datos con `summary()`.
 
 ```{r}
-summary(fosfo_data) #Estructura de los datos
+summary(fosfo_data) #Resumen estadístico básico
 ```
 
-En un análisis preeliminar, vemos que hay 18 columnas de datos. 
+En un análisis preeliminar, vemos que hay 18 columnas de datos: 
 
-*   La primera, contiene el tipo de las modificaciones en la secuencia, así como la ubicación de la modificación (la columna de identificación).
-*   La tercera columna, tenemos la descripción de la secuencia analizada. 
-*   La cuarta columna tenemos el Score, que evalúa la confiabilidad de la identificación de una secuencia peptídica. 
-*   Las siguientes 12 columnas, tratan los datos obtenidos de LC-SM, de los grupos tumorales con las dos réplicas técnicas. 
-*   Las dos últimas columnas contienen dos variables, CLASS y PHOSPHO, de tipo categóricas
+*   La primera columna contiene el tipo de modificaciones en la secuencia peptídica, así como la ubicación de la modificación (identificación de la modificación).
+*   La tercera columna describe la secuencia analizada.
+*   La cuarta columna presenta el Score, que evalúa la confiabilidad de la identificación de una secuencia peptídica. 
+*   Las siguientes 12 columnas contienen los datos obtenidos mediante LC-MS para los grupos tumorales y las dos réplicas técnicas. 
+*   Las dos últimas columnas contienen dos variables, CLASS y PHOSPHO, posiblemente de tipo categóricas
 
-Como las dos últimas variables son categóricas, las convertiremos a tipo factor para posibles análisis futuros.
+Dado que las dos últimas variables son de tipo categóricas, las convertiremos a tipo *factor* para facilitar posibles análisis futuros. 
+
+Verificaremos estas dos conversionescon str(), que ahora mostrará las dos variables con los niveles correspondientes.
 
 ```{r}
 fosfo_data$CLASS<-(as.factor(fosfo_data$CLASS))
@@ -85,11 +90,14 @@ fosfo_data$PHOSPHO<-(as.factor(fosfo_data$PHOSPHO))
 str(fosfo_data$PHOSPHO)
 ```
 
+Tal y como se sospechaba del análisis estadístico simple, las dos variables pueden ser leídas como categóricas de dos niveles cada una. 
+
 ## 2.1 Preprocesado de los datos
 
-Una vez cargados los datos, crearemos un objeto de clase `SumarizedExperiment` (una extensión de ExpressionSet), ya que permiten el manejo y almacenamiento de datos de fosfoproteómica, ya que puede organizar datos de abundancia junto con los metadatos relevantes para las filas (entradas). Gracias a este formato, podemos asociar metadatos a filas y columnas de manera más clara, y permite datos con réplicas (necesario para nuestro análisis).
+Una vez cargados los datos, crearemos un objeto de clase `SummarizedExperiment` (una extensión de `ExpressionSet`), que permite el manejo y almacenamiento de datos de fosfoproteómica. Este formato es adecuado porque organiza los datos de abundancia junto con los metadatos relevantes de las filas (entradas). Gracias a este formato, podemos asociar metadatos a las filas y columnas de manera más clara, y también permite manejar datos con réplicas, lo cual es necesario para nuestro análisis.
 
-Para crear el SummarizedExperiment, tendremos que cargar el paquete `BiocManager` 
+Para crear el `SummarizedExperiment`, primero necesitamos cargar el paquete `BiocManager` para instalar y cargar el paquete `SummarizedExperiment`.
+
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
@@ -97,27 +105,28 @@ if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
 }
 library(SummarizedExperiment)
 ```
-Una vez tenemos el paquete cargado, debemos extraer los datos de "abundancia", es decir, las lecturas de cada entrada, las cuales se ubican entre la columna 5 y la 16 (incluidas las dos).
 
-Del mismo modo, creamos un dataframe para los metadatos,los cuales ya conocemos por el análisis preeliminar (filas y columnas). Recordemos que tenemos 3 grupos por cada clase tumoral y tenemos 2 réplicas por cada grupo.
+Una vez tenemos el paquete cargado, debemos extraer los datos de "abundancia", es decir, las lecturas de cada entrada, que se encuentran entre la columna 5 y la 16 (incluidas ambas).
+
+Del mismo modo, creamos un dataframe para los metadatos,los cuales ya conocemos por el análisis preeliminar (información sobre las filas y columnas). Recordemos que tenemos 3 grupos para cada clase tumoral y tenemos 2 réplicas para cada grupo.
 
 ```{r}
-abundances <- fosfo_data[, 5:16]
+abundances <- fosfo_data[, 5:16] #Contenemos los datos de abundancias
 row_data <- fosfo_data[, c("SequenceModifications", "Accession", 
-                           "Description", "Score", "CLASS", "PHOSPHO")]
-col_metadata <- DataFrame(
+                           "Description", "Score", "CLASS", "PHOSPHO")] #Contenemos los metadatos de las filas
+col_metadata <- DataFrame( #Contenemos los metadatos de las columnas
     SampleID = colnames(abundances),
     Group = c(rep("MSS", 6), rep("PD", 6))
 )
 ```
 
-Como no disponemos de una columna en row_data con identificadores, crearemos una nueva columna en los metadatos de las filas denominada peptide_id.
+Como no disponemos de una columna en `row_data` con identificadores, crearemos una nueva columna en los metadatos de las filas denominada peptide_id.
 
 ```{r}
 row_data$peptide_id <- rownames(abundances)
 ```
 
-Una vez hemos pre-procesado los datos para que tengan el formato adecuado, podemos crear el SummarizedExperiment.
+Una vez hemos preprocesado los datos para que tengan el formato adecuado, podemos crear el SummarizedExperiment.
 
 ```{r}
 se <- SummarizedExperiment(
@@ -127,17 +136,29 @@ se <- SummarizedExperiment(
 )
 ```
 
+Como resumen, los metadatos de las filas (rowData) describirán las características de las entidades medidas, como secuencias, modificaciones o puntuaciones de identificación. Los metadatos de las columnas (colData) contienen información sobre las muestras o grupos tumorales. Los datos de ensayo (assay) son las mediciones experimentales (obtenidos por LC-SM) que se almacenan en una matriz para análisis posteriores.
+
 ## 2.2 Guardado de datos. Creación del repositorio de GitHUB.
 
-Ahora que tenemos el SE, lo exportaremos en formato .RDA para poder incluirlo en nuestro repositorio de github. Del mismo modo, extraeremos los datos de expressión (assay data), los metadatos de las muestras (column data) y los metadatos de las variables (row data) en formato de texto.
+Ahora que tenemos el `SummarizedExperiment` (SE), lo exportaremos en formato `.RDA` para incluirlo en nuestro repositorio de GitHub. Además, extraeremos los datos de expresión (assay data), los metadatos de las muestras (colData) y los metadatos de las variables (rowData) en formato de texto.
+
+Como ya disponemos de toda la información de SE, simplemente debemos usar la función save() y especificar el nombre del archivo que crearemos. 
 
 ```{r}
 save(se, file = "Fosfodatos_se.Rda") #Guardamos el SE en formato .Rda
+```
 
+Para los datos de ensayo y metadatos, primero debemos seleccionar que datos queremos del SE para cada archivo. Para los datos de assay, los guardaremos en counts, para posteriormente crear el archivo basándonos en esta información. Además, especificaremos la separación por tabuladores (`sep = "\t"`), el nombre de las filas (`row.names = TRUE`) y columnas (`col.names = TRUE`). Es importante especificar que los datos de texto no se rodeen de comillas, por lo que especificaremos que `quote=FALSE`.
+
+```{r}
 counts<-assay(se,"counts") #Obtenemos los datos de assay data
 write.table(counts, file = "datos_assay.txt", sep = "\t", 
             quote = FALSE, row.names = TRUE, col.names = TRUE) #Obtenemos el .txt
+```
 
+Seguiremos el mismo procedimiento para los metadatos.
+
+```{r}
 sample_metadata <- colData(se) #Obtenemos los metadatos de las muestras
 write.table(sample_metadata, file = "metadatos_muestras.txt", sep = "\t", 
             quote = FALSE, row.names = TRUE, col.names = TRUE) #Se guardan en un .txt
@@ -145,12 +166,11 @@ write.table(sample_metadata, file = "metadatos_muestras.txt", sep = "\t",
 gene_metadata <- rowData(se) #Obtenemos los metadatos de las variables
 write.table(gene_metadata, file = "metadatos_genes.txt", sep = "\t", 
             quote = FALSE, row.names = TRUE, col.names = TRUE) #Se guardan en un .txt
-
 ```
 
-En ocasiones, conviene mantener los metadatos por separado, por lo que crearemos un archivo que contenga, en formato .md, los metadatos de nuestro dataset.
+A veces es conveniente mantener los metadatos por separado. Por ello, crearemos un archivo .md que contenga los metadatos del dataset. Esta información se introducirá en markdown_content, que posteriomente se almacenará en el archivo `metadatos_dataset.md`.
 
-```{r}
+```{r include=FALSE}
 markdown_content <- "
 # Metadatos del Dataset de Fosfoproteómica
 
@@ -182,13 +202,14 @@ El dataset consta de las siguientes columnas:
 - Las columnas `CLASS` y `PHOSPHO` son categóricas y pueden ser convertidas a factores para 
 análisis estadísticos.
 "
+```
 
-
+```{r}
 writeLines(markdown_content, "metadatos_dataset.md")
 ```
 
 
-Toda esta información, el objeto SE, así como los metadatos y el resto de datos asociados al SE, se tendrán que almacenar en un repositorio de GitHUB. Con el repositorio local previamente creado, podemos cargar los datos previamente guardados. Primero tendremos que agregar los archivos al directorio git. En caso de que los archivos ya están guardados, realizamos un commit, que implica "cargar" las modificaciones que hemos generado en los ficheros, para finalmente "empujar" (push) hacia el directorio remoto.
+Toda esta información, junto con el objeto SE, los metadatos y los demás archivos generados, deben almacenarse en un repositorio de GitHub. Con el repositorio local previamente creado, podemos cargar los archivos guardados. Primero, agregamos los archivos al directorio Git (`git add`). Si los archivos ya están guardados, realizamos un commit para "cargar" las modificaciones generadas (`git commit`) y, finalmente, un push para subir los cambios al repositorio remoto (`git push origin main`).
 
 ```{r}
 # Agregar todos los archivos
