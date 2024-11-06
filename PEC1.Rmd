@@ -399,9 +399,6 @@ Primero crearemos un nuevo objeto con los daos de las abundancias con varianza d
 
 ```{r}
 # Extraemos los datos de abundancia y calculamos la varianza de todos los datos de abundancia
-abundance_data
-
-
 colMeans(abundance_data)  # Debe devolver valores cercanos a 0
 apply(abundance_data, 2, sd)
 
