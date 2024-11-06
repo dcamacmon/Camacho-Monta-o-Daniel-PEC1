@@ -240,9 +240,8 @@ Vemos que el test de homogeneidad de varianzas acepta la hipótesis nula, por lo
 Para obtener el resultado de test de Levene para todas las réplicas, primero crearemos un nuevo dataframe vacío que contendrá el resultado del test, tanto el p-valor como el identificador de la muestra.
 
 ```{r}
-
 abundance_data<-assay(se, "counts")
-abundance_data <- t(scale(t(abundance_data)))
+abundance_data <- scale(abundance_data)
 
 
 
@@ -400,9 +399,19 @@ Primero crearemos un nuevo objeto con los daos de las abundancias con varianza d
 
 ```{r}
 # Extraemos los datos de abundancia y calculamos la varianza de todos los datos de abundancia
-filtered_counts <- counts[, apply(abundance_data, 2, var) > 0]
-fosfo_variances <- apply(filtered_counts, 1, var)
+abundance_data
 
+
+colMeans(abundance_data)  # Debe devolver valores cercanos a 0
+apply(abundance_data, 2, sd)
+
+
+filtered_counts <- counts[, apply(abundance_data, 2, var)]
+filtered_counts <- na.omit(filtered_counts)
+head(filtered_counts)
+
+fosfo_variances <- apply(filtered_counts, 1, var)
+fosfo_variances
 # Filtramos los genes con baja varianza, con un umbral a 0.01
 filtered_counts <- filtered_counts[fosfo_variances > 1e-2, ] 
 ```
@@ -410,9 +419,9 @@ filtered_counts <- filtered_counts[fosfo_variances > 1e-2, ]
 A continuación, realizaremos el PCA y crearemos el data frame con los resultados. Además, cabe destacar la necesidad de transponer los datos de los fosfopéptidos para que se encuentren en las columnas (hasta ahora se han encontrado en las filas). El PCA se centrará y escalará los datos, lo que es recomendable para asegurar que todas las variables contribuyan de manera equitativa al análisis. También añadiremos la información de los grupos (MSS o PD), lo que facilitará la lectura de los datos en función de los grupos.
 
 ```{r}
-pca_result <- prcomp(t(filtered_counts), center = TRUE, scale. = TRUE)
-pca_data <- as.data.frame(pca_result$x)
+pca_result <- prcomp(t(abundance_data), center = TRUE, scale. = TRUE)
 
+pca_data <- as.data.frame(pca_result$x)
 # Agregamos información de grupo
 pca_data$Group <- colData(se)$Group
 ```
@@ -528,7 +537,7 @@ top_cargas_pc3$Fosfopeptido <- factor(top_cargas_pc3$Fosfopeptido,
                                       levels = top_cargas_pc3$Fosfopeptido)
 
 #Creación del gráfico
-p3<-ggplot(top_cargas_pc3, aes(x = Fosfopeptido, y = PC3)) +
+ggplot(top_cargas_pc3, aes(x = Fosfopeptido, y = PC3)) +
   geom_bar(stat = "identity") +
   coord_flip() +
   labs(title = "Top 30 FP en función de PC3",
@@ -544,11 +553,10 @@ Como podemos ver, cada fosfopéptido tiene una influencia diferente en cada CP, 
 Para continuar con el análisis, realizaremos un ANOVA de un factor para ver si hay diferencias significativas en las abundancias de fosfopéptidos entre los grupos. Como los datos están estructurados con las variables (fosfopéptidos) en las filas y los grupos (MSS o PD) en las columnas, tendremos que transponer los datos de las abundancias.
 
 ```{r}
-abundancias <- assay(se, "counts")
 grupos <- colData(se)$Group
 
 #Para tener las lecturas en horizontal y los fosfopéptidos en vertical
-abundancias_df <- as.data.frame(t(abundancias))  
+abundancias_df <- as.data.frame(t(abundance_data))  
 abundancias_df$grupo <- grupos
 ```
 
