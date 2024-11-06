@@ -240,7 +240,15 @@ Vemos que el test de homogeneidad de varianzas acepta la hipótesis nula, por lo
 Para obtener el resultado de test de Levene para todas las réplicas, primero crearemos un nuevo dataframe vacío que contendrá el resultado del test, tanto el p-valor como el identificador de la muestra.
 
 ```{r}
+
 abundance_data<-assay(se, "counts")
+abundance_data <- t(scale(t(abundance_data)))
+
+
+
+
+
+
 
 # Obtenemos los nombres de las columnas para las réplicas
 muestras <- c("M1", "M5", "T49", "M42", "M43", "M64") 
@@ -301,7 +309,7 @@ Finalmente, mostramos el resultado de los test de Levene.
 print(resultados_levene)
 ```
 
-Vemos entonces, que no hay diferencias significativas en la variablidad entre las réplicas de las muestras de los dos grupos. Esto implica, que podemos promediar las réplicas, o mantenerlas independientes para los futuros análisis. En este caso, debido a que en los estudios de LC-MS la variabilidad puede mostrar diferencias biológicas subyacentes en las muestras, mantendremos cada réplica como una muestra independiente.
+Vemos entonces, que hay diferencias significativas en la variablidad entre las réplicas de las muestras de los dos grupos. Esto implica, que no podemos promediar las réplicas, o mantenerlas independientes para los futuros análisis. En este caso, debido a que en los estudios de LC-MS la variabilidad puede mostrar diferencias biológicas subyacentes en las muestras, mantendremos cada réplica como una muestra independiente.
 
 ## 3.2 Visualización de la distribución
 
@@ -316,7 +324,6 @@ library(reshape2)
 ```
 
 ```{r}
-abundance_data <- assays(se)$counts
 abundance_long <- melt(abundance_data)
 colnames(abundance_long) <- c("Fosfopéptido", "Muestra", "Abundancia")
 ```
@@ -543,7 +550,6 @@ grupos <- colData(se)$Group
 #Para tener las lecturas en horizontal y los fosfopéptidos en vertical
 abundancias_df <- as.data.frame(t(abundancias))  
 abundancias_df$grupo <- grupos
-head(abundancias_df)
 ```
 
 Además, debemos tener en cuenta que no podemos aplicar un ANOVA a cada fosfopéptido independientemente, por lo que usaremos sapply para repetir el proceso en todas las columnas (ahora la variable fosfopéptido) y guardaremos el resultado en anova_results.
@@ -588,8 +594,8 @@ signif_abundances <- assay(se, "counts")[signif_peptides, ]
 
 # Coloca las medias de cada grupo en un data frame
 group_means <- data.frame(
-  MSS = rowMeans(signif_abundances[, colData(se)$Group == "MSS"]),
-  PD = rowMeans(signif_abundances[, colData(se)$Group == "PD"])
+  MSS_mean = rowMeans(signif_abundances[, colData(se)$Group == "MSS"]),
+  PD_mean = rowMeans(signif_abundances[, colData(se)$Group == "PD"])
 )
 
 # Calcula la diferencia en medias
@@ -605,13 +611,31 @@ colnames(signif_abundances_long) <- c("peptide_id", "Sample", "Abundance")
 # Agrega información de grupo
 signif_abundances_long$Group <- colData(se)$Group[signif_abundances_long$Sample]
 
-# Visualización con ggplot2
-ggplot(signif_abundances_long, aes(x = Group, y = Abundance, fill = Group)) +
-  geom_boxplot() +
-  facet_wrap(~ peptide_id, scales = "free") +
-  theme_minimal() +
-  labs(title = "Distribución de Abundancia de Fosfopéptidos Significativos por Grupo")
 
+
+
+
+sifnif_abundances <- t(scale(t(signif_abundances)))
+
+# Calcula las medias de abundancia por grupo
+group_means <- data.frame(
+  MSS_mean = rowMeans(signif_abundances[, colData(se)$Group == "MSS"]),
+  PD_mean = rowMeans(signif_abundances[, colData(se)$Group == "PD"])
+)
+
+# Carga ggplot2 para la visualización
+library(ggplot2)
+
+# Gráfico de dispersión de abundancias medias
+ggplot(group_means, aes(x = MSS_mean, y = PD_mean)) +
+  geom_point(color = "skyblue", size = 3, alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +  # Línea de identidad
+  theme_minimal() +
+  labs(
+    title = "Comparación de Abundancia Media de Fosfopéptidos Significativos entre MSS y PD",
+    x = "Abundancia Media en MSS",
+    y = "Abundancia Media en PD"
+  )
 ```
 
 
