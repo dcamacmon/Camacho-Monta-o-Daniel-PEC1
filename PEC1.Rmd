@@ -112,8 +112,10 @@ Del mismo modo, creamos un dataframe para los metadatos,los cuales ya conocemos 
 
 ```{r}
 abundances <- fosfo_data[, 5:16] #Contenemos los datos de abundancias
+#Contenemos los metadatos de las filas
 row_data <- fosfo_data[, c("SequenceModifications", "Accession", 
-                           "Description", "Score", "CLASS", "PHOSPHO")] #Contenemos los metadatos de las filas
+                           "Description", "Score", "CLASS", "PHOSPHO")] 
+
 col_metadata <- DataFrame( #Contenemos los metadatos de las columnas
     SampleID = colnames(abundances),
     Group = c(rep("MSS", 6), rep("PD", 6))
@@ -280,9 +282,10 @@ resultados_levene <- data.frame(Muestra = character(),
 Luego iteramos a través de cada muestra, donde los sufijos "_MSS" o "_PD" indican el grupo, y "_1" o "_2" indican la réplica. Ejecutamos un bucle que verifica la existencia de columnas para las réplicas MSS o PD, evalúa la varianza entre las dos réplicas con el test de Levene y almacena los resultados en el data.frame.
 
 ```{r}
+ # Inicializamos el dataframe para almacenar resultados
 resultados_levene <- data.frame(Muestra = character(),
                                  p_valor = numeric(),
-                                 stringsAsFactors = FALSE) # Inicializamos el dataframe para almacenar resultados
+                                 stringsAsFactors = FALSE)
 
 # Iteramos sobre las muestras
 for (muestra in muestras) {
@@ -649,7 +652,8 @@ Visualizaremos los datos que hemos obtenido, en función de PD y MSS y veremos s
 ```{r}
 ggplot(group_means, aes(x = MSS_mean, y = PD_mean)) +
   geom_point(color = "darkorchid", size = 3, alpha = 0.5) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +  # Línea de identidad
+  # Añadimos línea de identidad
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +  
   theme_minimal() +
   labs(
     title = "Comparación de Abundancia Media de Fosfopéptidos Significativos entre MSS y PD",
