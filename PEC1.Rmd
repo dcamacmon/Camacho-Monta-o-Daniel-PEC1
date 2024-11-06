@@ -542,8 +542,7 @@ grupos <- colData(se)$Group
 
 #Para tener las lecturas en horizontal y los fosfopéptidos en vertical
 abundancias_df <- as.data.frame(t(abundancias))  
-abundancias_df$peptide_id <- t(rowData(se)$peptide_id)
-abundancias_df$grupo <- as.factor(abundancias_df$grupo)
+abundancias_df$grupo <- grupos
 head(abundancias_df)
 ```
 
@@ -565,14 +564,53 @@ anova_results <- data.frame(Fosfopeptido = names(anova_results),
 
 anova_results$p_adjusted <- p.adjust(anova_results$p_value, method = "fdr")
 
-significativos <- subset(anova_results, p_adjusted < 0.05)
-str(significativos$Fosfopeptido)
 ```
-Después del test ANOVA vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
+Después del test ANOVA vemos que, de los 1438 fosfopéptidos analizados, solo 104 muestran diferencias significativas (teniendo en cuenta el p_valor ajustado) entre los grupos MSS y PD. Estos fosfopéptidos podrían ser útiles para distinguir los dos subtipus tumorales, lo que sugiere que existen patrones de fosforilación asociados a las diferencias moleculares entre los grupos.
 
 Para poder determinar patrones diferenciales, podríamos estudiar la posibilidad de patrones entre la fosforilación de Y o de S/T, información contenida en los metadatos (col(Data))
 
 ```{r}
+#Seleccionamos los índices que tienen un p-valor inferior a 0.05
+signif_peptides <- which(anova_results$p_adjusted < 0.05)
+
+#Obtenemos los datos y metadatos a partir de los índices seleccionados
+signif_abundances <- assay(se, "counts")[signif_peptides, ]
+signif_row_data <- rowData(se)[signif_peptides, ]
+
+#Mostramos los 6 primeros resultados
+print(head(signif_row_data$SequenceModifications))
+```
+Ahora que hemos extraído tanto los datos como los metadatos, podemos volver a analizar la distribución, para observar diferencias entre 
+
+```{r}
+# Abundancias de fosfopéptidos significativos
+signif_abundances <- assay(se, "counts")[signif_peptides, ]
+
+# Coloca las medias de cada grupo en un data frame
+group_means <- data.frame(
+  MSS = rowMeans(signif_abundances[, colData(se)$Group == "MSS"]),
+  PD = rowMeans(signif_abundances[, colData(se)$Group == "PD"])
+)
+
+# Calcula la diferencia en medias
+group_means$difference <- group_means$MSS - group_means$PD
+
+library(reshape2)
+library(ggplot2)
+
+# Convierte las abundancias a formato largo
+signif_abundances_long <- melt(signif_abundances)
+colnames(signif_abundances_long) <- c("peptide_id", "Sample", "Abundance")
+
+# Agrega información de grupo
+signif_abundances_long$Group <- colData(se)$Group[signif_abundances_long$Sample]
+
+# Visualización con ggplot2
+ggplot(signif_abundances_long, aes(x = Group, y = Abundance, fill = Group)) +
+  geom_boxplot() +
+  facet_wrap(~ peptide_id, scales = "free") +
+  theme_minimal() +
+  labs(title = "Distribución de Abundancia de Fosfopéptidos Significativos por Grupo")
 
 ```
 
